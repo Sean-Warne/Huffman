@@ -2,10 +2,11 @@
 #include <stdlib.h>
 #include "timer.h"
 
-int main (void)
+int main ()
 {
 	int i, j;
 	double start, finish, elapsed;
+	float filesize = 0.0;
 
 	char* alphabet = "abcdefghijklmnopqrstuvwxyz";
 	int englishLetterPercent [26] = {8, 2, 3, 4, 13, 2, 2, 6, 7, 0, 1, 4, 2, 7, 8, 2, 0, 6, 6, 9, 3, 1, 2, 0, 2, 0};
@@ -13,7 +14,9 @@ int main (void)
 
 	FILE *f;
 
-	float filesize = 1.0;
+	printf ("Enter the size of the file in Gb > ");
+	scanf  ("%f", &filesize);
+
 	int bytesPerGig = 1073741824;
 	int charSize = sizeof (char);
 
@@ -47,7 +50,7 @@ int main (void)
 	}
 
 	/* write ending character to file */
-	fprintf (f, "%c", 'A');
+	fprintf (f, "%c", '\n');
 
 	fclose(f);
 	GET_TIME (finish);

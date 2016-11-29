@@ -105,7 +105,7 @@ void compressFile(FILE *input, FILE *output, long long codeTable[])
     long long n, length, bitsLeft = 8;
     long long originalBits = 0, compressedBits = 0;
 
-    while ((c = fgetc (input)) != EOF)
+    while ((c = fgetc (input)) != 10)
     {
         originalBits++;
         if (c == 32)
@@ -225,10 +225,13 @@ int main()
 
     float start, finish, elapsed;
 
+    printf ("Building the Huffman Tree...\n");
     buildHuffmanTree (&tree);
 
+    printf ("Populating the code table...\n");
     fillTable (codeTable, tree, 0L);
 
+    printf ("Inverting the codes...\n");
     invertCodes (codeTable, codeTable2);
 
     /* get input details from user */
@@ -243,11 +246,13 @@ int main()
     output = fopen(outFile, "w");
 
     if (compress == 1) {
+	    printf ("Compressing the file, please wait...\n");
 	    GET_TIME (start);
 	    compressFile (input, output, codeTable2);
 	    GET_TIME (finish);
     }
     else {
+	    printf ("Decompressing the file, please wait...\n");
     	    decompressFile (input, output, tree);
     }
 
