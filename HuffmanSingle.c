@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include "timer.h"
 
 #define len(x) ((long long) log10(x) + 1)
 
@@ -222,6 +223,8 @@ int main()
     char outFile[20];
     FILE *input, *output;
 
+    float start, finish, elapsed;
+
     buildHuffmanTree (&tree);
 
     fillTable (codeTable, tree, 0L);
@@ -239,10 +242,17 @@ int main()
     input = fopen(inFile, "r");
     output = fopen(outFile, "w");
 
-    if (compress == 1)
-        compressFile (input, output, codeTable2);
-    else
-        decompressFile (input, output, tree);
+    if (compress == 1) {
+	    GET_TIME (start);
+	    compressFile (input, output, codeTable2);
+	    GET_TIME (finish);
+    }
+    else {
+    	    decompressFile (input, output, tree);
+    }
+
+    elapsed = finish - start;
+    printf ("Code took %f seconds to complete.", elapsed);
 
     return 0;
 }

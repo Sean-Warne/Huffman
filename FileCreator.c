@@ -1,9 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include "timer.h"
 
 int main (void)
 {
 	int i, j;
+	double start, finish, elapsed;
 
 	char* alphabet = "abcdefghijklmnopqrstuvwxyz";
 	int englishLetterPercent [26] = {8, 2, 3, 4, 13, 2, 2, 6, 7, 0, 1, 4, 2, 7, 8, 2, 0, 6, 6, 9, 3, 1, 2, 0, 2, 0};
@@ -39,6 +41,7 @@ int main (void)
 	}
 
 	/* fill the file */
+	GET_TIME (start);
 	for (i = 0; i < iterations; i++) {
 		fprintf (f, "%c", alphabet[englishLetterFreq[rand() % 99]]);
 	}
@@ -47,6 +50,10 @@ int main (void)
 	fprintf (f, "%c", 'A');
 
 	fclose(f);
+	GET_TIME (finish);
+	elapsed = finish - start;
+
+	printf ("File created successfully!\nCode took %f seconds to complete.\n", elapsed);
 
 	return 0;
 }
