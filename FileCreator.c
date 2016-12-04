@@ -9,7 +9,7 @@ int main ()
 	float filesize = 0.0;
 
 	char* alphabet = "abcdefghijklmnopqrstuvwxyz";
-	int englishLetterPercent [26] = {8, 2, 3, 4, 13, 2, 2, 6, 7, 0, 1, 4, 2, 7, 8, 2, 0, 6, 6, 9, 3, 1, 2, 0, 2, 0};
+	int englishLetterPercent [26] = {5, 2, 3, 4, 16, 2, 2, 6, 7, 0, 1, 4, 2, 7, 8, 2, 0, 6, 6, 9, 3, 1, 2, 0, 2, 0};
 	int*   englishLetterFreq = (int *) malloc(sizeof (int) * 100);	
 
 	FILE *f;
@@ -48,9 +48,6 @@ int main ()
 	for (i = 0; i < iterations; i++) {
 		fprintf (f, "%c", alphabet[englishLetterFreq[rand() % 99]]);
 	}
-
-	/* write ending character to file */
-	fprintf (f, "%c", '\n');
 
 	fclose(f);
 	GET_TIME (finish);

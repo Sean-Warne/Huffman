@@ -98,27 +98,40 @@ void fillTable(long long codeTable[], Node *tree, long long Code)
     return;
 }
 
-/* function to compress the input */
+/* function to compress the input; multi or single threaded */
 void compressFile(FILE *input, FILE *output, long long codeTable[])
 {
-    char bit, c, x = 0;
-    long long n, length, bitsLeft = 8;
-    long long originalBits = 0, compressedBits = 0;
+    char bit, c, x = 0; // thread local
+    long long n, length, bitsLeft = 8; // thread local
+    long long originalBits = 0, compressedBits = 0; // thread global
 
-    while ((c = fgetc (input)) != 10)
+    /* print out the code table */
+    int j;
+    printf("\n\n");
+    for (j = 0; j < sizeof(codeTable); j++)
+    {
+	printf ("%i\t%lli\n", j, codeTable[j]);
+    }
+    printf ("\n\n");
+
+
+    /* Continue to loop while the file still has characters. * 
+     * Use multithreading here to break the file into chunks */
+    while ((c = fgetc (input)) != EOF)
     {
         originalBits++;
-        if (c == 32)
+        if (c == 0x20)
 	{
             length = len (codeTable[25]);
             n = codeTable[25];
         }
         else
 	{
-            length = len (codeTable[c - 97]);
-            n = codeTable[c - 97];
+            length = len (codeTable[c - 0x61]);
+            n = codeTable[c - 0x61];
         }
 
+	/* Compress the character */
         while (length > 0)
 	{
             compressedBits++;
@@ -129,8 +142,8 @@ void compressFile(FILE *input, FILE *output, long long codeTable[])
             length--;
             if (bitsLeft == 0)
 	    {
-                fputc (x,output);
-                x = 0;
+                fputc (x, output);
+		x = 0;
                 bitsLeft = 8;
             }
             x = x << 1;
@@ -140,7 +153,7 @@ void compressFile(FILE *input, FILE *output, long long codeTable[])
     if (bitsLeft != 8)
     {
         x = x << (bitsLeft - 1);
-        fputc (x,output);
+        fputc (x, output);
     }
 
     /* prlong long details of compression on the screen */
@@ -161,30 +174,31 @@ void decompressFile (FILE *input, FILE *output, Node *tree)
 
     while ((c = fgetc (input)) != EOF)
     {
-
         for (i = 0; i < 8; i++)
 	{
             bit = c & mask;
             c = c << 1;
-            if (bit == 0){
+            if (bit == 0)
+	    {
                 current = current->left;
-                if (current->letter != 127)
+                if (current->letter != 0x7F)
 		{
                     if (current->letter == 25)
-                        fputc(32, output);
+                        fputc(0x20, output);
                     else
-                        fputc (current->letter + 97, output);
+                        fputc (current->letter + 0x61, output);
                     current = tree;
                 }
             }
             else
 	    {
                 current = current->right;
-                if (current->letter != 127){
+                if (current->letter != 0x7F)
+		{
                     if (current->letter == 25)
-                        fputc (32, output);
+                        fputc (0x20, output);
                     else
-                        fputc (current->letter + 97, output);
+                        fputc (current->letter + 0x61, output);
                     current = tree;
                 }
             }
@@ -223,7 +237,7 @@ int main()
     char outFile[20];
     FILE *input, *output;
 
-    float start, finish, elapsed;
+    double start, finish, elapsed;
 
     printf ("Building the Huffman Tree...\n");
     buildHuffmanTree (&tree);
@@ -245,19 +259,19 @@ int main()
     input = fopen(inFile, "r");
     output = fopen(outFile, "w");
 
+    GET_TIME (start);
     if (compress == 1) {
 	    printf ("Compressing the file, please wait...\n");
-	    GET_TIME (start);
 	    compressFile (input, output, codeTable2);
-	    GET_TIME (finish);
     }
     else {
 	    printf ("Decompressing the file, please wait...\n");
     	    decompressFile (input, output, tree);
     }
+    GET_TIME (finish);
 
     elapsed = finish - start;
-    printf ("Code took %f seconds to complete.", elapsed);
+    printf ("Code took %f seconds to complete.\n", elapsed);  
 
     return 0;
 }
