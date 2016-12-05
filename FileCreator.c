@@ -8,8 +8,8 @@ int main ()
 	double start, finish, elapsed;
 	float filesize = 0.0;
 
-	char* alphabet = "abcdefghijklmnopqrstuvwxyz";
-	int englishLetterPercent [26] = {5, 2, 3, 4, 16, 2, 2, 6, 7, 0, 1, 4, 2, 7, 8, 2, 0, 6, 6, 9, 3, 1, 2, 0, 2, 0};
+	char* alphabet = "abcdefghijklmnopqrstuvwxyz ";
+	int englishLetterPercent [27] = {8, 2, 3, 4, 12, 2, 2, 6, 7, 2, 0, 4, 2, 6, 7, 2, 1, 5, 5, 7, 3, 1, 2, 0, 2, 0, 5};
 	int*   englishLetterFreq = (int *) malloc(sizeof (int) * 100);	
 
 	FILE *f;
@@ -18,10 +18,9 @@ int main ()
 	scanf  ("%f", &filesize);
 
 	int bytesPerGig = 1073741824;
-	int charSize = sizeof (char);
 
 	// number of characters
-	int iterations = (filesize * bytesPerGig) / charSize; 
+	int iterations = (filesize * bytesPerGig); 
 
 	f = fopen ("file.txt", "w");
 	if (f == NULL) {
@@ -32,7 +31,7 @@ int main ()
 	/* fill the letter array */
 	int   range = 0;
 	int lastMax = 0;
-	for (i = 0; i < 26; i++)
+	for (i = 0; i < 27; i++)
 	{
 		range += englishLetterPercent[i];
 		for (j = lastMax; j < range; j++)
@@ -46,7 +45,7 @@ int main ()
 	/* fill the file */
 	GET_TIME (start);
 	for (i = 0; i < iterations; i++) {
-		fprintf (f, "%c", alphabet[englishLetterFreq[rand() % 99]]);
+		fprintf (f, "%c", alphabet[englishLetterFreq[rand() % 100]]);
 	}
 
 	fclose(f);
