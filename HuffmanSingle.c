@@ -133,6 +133,7 @@ void* compressFile(void* rank)
     if (threadCount - 1 == myRank) 
     {
 	    last = filesize;
+	    printf ("%i\t%i", threadCount, (int)myRank);
 	    flag = 1;
     }
     else
@@ -141,14 +142,15 @@ void* compressFile(void* rank)
     }
 
     char *out = (char *) malloc (sizeof (char) * (last - first));
-    char *out2;
-    size_t size = strlen (out);
+    char *out2 = (char *) malloc (sizeof (char));
+    size_t size = strlen (out2);
 
     /* Continue to loop while the file still has characters. * 
      * Use multithreading here to break the file into chunks */
     for (i = first; i < last; i++)
     {
 	c = fgetc (input);
+	printf ("%c ", c);
         originalBits++;
         if (c == 0x20)
 	{
@@ -173,9 +175,9 @@ void* compressFile(void* rank)
             if (bitsLeft == 0)
 	    {
 		size++;
-                out2 = (char*) malloc (size + 1); 
-		strcpy (out2, out);
+                out2 = (char *) malloc (size + 1); 
 		out2[size] = x;
+		strcat (out, out2);
 		free (out2);
 
 		x = 0;
@@ -185,14 +187,14 @@ void* compressFile(void* rank)
         }
     }
 
-    if (bitsLeft != 8 && flag == 1)
+    if (bitsLeft != 8)
     {
         x = x << (bitsLeft - 1);
 	size++;
 	out2 = (char *) malloc (size + 1 + 1);
-	strcpy (out2, out);
 	out2[size] = x;
-	out2[size] = '\0';
+	out2[size + 1] = '\0';
+	strcat (out, out2);
 	free (out2);
     }
 
