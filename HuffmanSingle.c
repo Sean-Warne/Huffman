@@ -1,10 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include <iostream>
-#include <fstream>
 #include <stdlib.h>
 #include <pthread.h>
+#include <semaphore.h>
+#include <string.h>
 #include "timer.h"
 
 #define len(x) ((long long) log10(x) + 1)
@@ -20,20 +20,19 @@ struct node
 typedef struct node Node;
 
 long long englishLetterFrequencies [27] = {8, 2, 3, 4, 12, 2, 2, 6, 7, 2, 0, 4, 2, 6, 7, 2, 1, 5, 5, 7, 3, 1, 2, 0, 2, 0, 5};   
-
 long long codeTable[27], codeTable2[27]; 
 
-/* determine size of file in bytes */
-fseek (input, 0L, SEEK_END);
-int filesize = (int) ftell (input);
-fseek (input, 0L, SEEK_SET);  
+/* file values */
+int filesize;
+FILE *input, *output;
 
 /* multithreading variables */
 pthread_mutex_t myMutex;
 pthread_cond_t condVar;
+sem_t arr;
 int threadCount;
-char *outArr = (char*) malloc (sizeof (char) * filesize);
 long long originalBits = 0, compressedBits = 0;
+char **outArr;
 
 /* finds and returns the smallest sub-tree in the forest */
 long long findSmaller (Node *array[], long long differentFrom)
@@ -117,30 +116,37 @@ void fillTable(long long codeTable[], Node *tree, long long Code)
 }
 
 /* function to compress the input; multi or single threaded */
-void compressFile(void* rank, long long codeTable[])
+void* compressFile(void* rank)
 {
     char bit, c, x = 0;
     int n, length, bitsLeft = 8;
+    int flag = 0;
 
     /* threading values */
     long myRank = (long) rank;
     int split = filesize /threadCount;
     int first = myRank * split;
     int last;
+    int i;
 
     /* last thread goes to end of file no matter what */
     if (threadCount - 1 == myRank) 
     {
 	    last = filesize;
+	    flag = 1;
     }
     else
     {
 	    last = (myRank + 1) * split;
     }
 
+    char *out = (char *) malloc (sizeof (char) * (last - first));
+    char *out2;
+    size_t size = strlen (out);
+
     /* Continue to loop while the file still has characters. * 
      * Use multithreading here to break the file into chunks */
-    for (int i = first; i < last; i++)
+    for (i = first; i < last; i++)
     {
 	c = fgetc (input);
         originalBits++;
@@ -166,7 +172,12 @@ void compressFile(void* rank, long long codeTable[])
             length--;
             if (bitsLeft == 0)
 	    {
-                fputc (x, output);
+		size++;
+                out2 = (char*) malloc (size + 1); 
+		strcpy (out2, out);
+		out2[size] = x;
+		free (out2);
+
 		x = 0;
                 bitsLeft = 8;
             }
@@ -174,16 +185,20 @@ void compressFile(void* rank, long long codeTable[])
         }
     }
 
-    if (bitsLeft != 8)
+    if (bitsLeft != 8 && flag == 1)
     {
         x = x << (bitsLeft - 1);
-        fputc (x, output);
+	size++;
+	out2 = (char *) malloc (size + 1 + 1);
+	strcpy (out2, out);
+	out2[size] = x;
+	out2[size] = '\0';
+	free (out2);
     }
 
-    /* prlong long details of compression on the screen */
-    fprintf (stderr, "Original bits = %lli\n", originalBits * 8);
-    fprintf(stderr, "Compressed bits = %lli\n", compressedBits);
-    fprintf(stderr, "Saved %.2f%% of memory\n", ((float) compressedBits / (originalBits * 8)) * 100);
+    sem_wait (&arr);
+    outArr[(int)myRank] = out;
+    sem_post (&arr);
 
     return;
 }
@@ -195,7 +210,7 @@ void decompressFile (FILE *input, FILE *output, Node *tree)
     char c, bit;
     char mask = 1 << 7;
     int i, filesize = 0, readin = 0;
-    
+
     while ( filesize > readin)
     {
 	c = fgetc (input);
@@ -266,15 +281,17 @@ int main(int argc, char* argv[])
     long long compress;
     char inFile[20];
     char outFile[20];
-    FILE *input, *output;
+    int i;
 
     /* initialize multithreading values */
     long thread;
     pthread_t* threadHandles;
-    threadcount = strtol (argv[1], NULL, 10);
+    threadCount = strtol (argv[1], NULL, 10);
     threadHandles = (pthread_t*) malloc (threadCount * sizeof (pthread_t));
     pthread_mutex_init (&myMutex, NULL);
     pthread_cond_init (&condVar, NULL);
+    sem_init (&arr, 0, 1);
+    outArr = (char**) malloc (sizeof(char) * threadCount);
 
     double start, finish, elapsed;
 
@@ -298,6 +315,11 @@ int main(int argc, char* argv[])
     input = fopen(inFile, "r");
     output = fopen(outFile, "w");
 
+    /* determine size of file in bytes */
+    fseek (input, 0L, SEEK_END);
+    filesize = (int) ftell (input);    
+    fseek (input, 0L, SEEK_SET);  
+
     GET_TIME (start);
     if (compress == 1) {
 	    /* thread creation loop */
@@ -314,6 +336,14 @@ int main(int argc, char* argv[])
 		    pthread_join (threadHandles[thread], NULL);
 		    pthread_detach (threadHandles[thread]);
 	    }
+
+	    for (thread = 0; thread < threadCount; thread++)
+	    {
+		    for (i = 0; i < sizeof (outArr[thread]); i++)
+		    {
+			    fputc (outArr[thread][i], output);
+		    }
+	    }
     }
     else 
     {
@@ -321,6 +351,10 @@ int main(int argc, char* argv[])
     	    decompressFile (input, output, tree);
     }
     GET_TIME (finish);
+
+    fprintf (stderr, "Original bits = %lli\n", originalBits * 8);
+    fprintf(stderr, "Compressed bits = %lli\n", compressedBits);
+    fprintf(stderr, "Saved %.2f%% of memory\n", ((float) compressedBits / (originalBits * 8)) * 100);
 
     elapsed = finish - start;
     printf ("Code took %f seconds to complete.\n", elapsed);  
