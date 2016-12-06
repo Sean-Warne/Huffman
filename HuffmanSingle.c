@@ -3,6 +3,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include <pthread.h>
+#include <unistd.h>
 #include <semaphore.h>
 #include <string.h>
 #include "timer.h"
@@ -118,7 +119,8 @@ void fillTable(long long codeTable[], Node *tree, long long Code)
 /* function to compress the input; multi or single threaded */
 void* compressFile(void* rank)
 {
-    char bit, c, x = 0;
+    char bit, x = 0;
+    char* c;
     int n, length, bitsLeft = 8;
     int flag = 0;
 
@@ -133,7 +135,6 @@ void* compressFile(void* rank)
     if (threadCount - 1 == myRank) 
     {
 	    last = filesize;
-	    printf ("%i\t%i", threadCount, (int)myRank);
 	    flag = 1;
     }
     else
@@ -144,23 +145,28 @@ void* compressFile(void* rank)
     char *out = (char *) malloc (sizeof (char) * (last - first));
     char *out2 = (char *) malloc (sizeof (char));
     size_t size = strlen (out2);
+    void *buf;
 
     /* Continue to loop while the file still has characters. * 
      * Use multithreading here to break the file into chunks */
     for (i = first; i < last; i++)
-    {
-	c = fgetc (input);
-	printf ("%c ", c);
+    {   
+	buf = (void*) malloc (sizeof (char)); 
+	pread (fileno (input), buf, (size_t)sizeof (char), (off_t)i);
+	c = (char*)buf;
+	free (buf);
+	printf ("%c", c[0]);
         originalBits++;
-        if (c == 0x20)
+
+        if (*c == 0x20)
 	{
             length = len (codeTable[25]);
             n = codeTable[25];
         }
         else
 	{
-            length = len (codeTable[c - 0x61]);
-            n = codeTable[c - 0x61];
+            length = len (codeTable[*c - 0x61]);
+            n = codeTable[*c - 0x61];
         }
 
 	/* Compress the character */
