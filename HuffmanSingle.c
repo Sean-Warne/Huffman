@@ -134,7 +134,7 @@ void* compressFile(void* rank)
     /* last thread goes to end of file no matter what */
     if (threadCount - 1 == myRank) 
     {
-	    last = filesize;
+	    last = filesize - 1;
 	    flag = 1;
     }
     else
@@ -142,9 +142,9 @@ void* compressFile(void* rank)
 	    last = (myRank + 1) * split;
     }
 
-    char *out = (char *) malloc (sizeof (char) * (last - first));
-    char *out2 = (char *) malloc (sizeof (char));
-    size_t size = strlen (out2);
+    char *tmp = (char *) malloc (sizeof (char));
+    size_t size = 1;
+    char* total = (char *) malloc (size);
     void *buf;
 
     /* Continue to loop while the file still has characters. * 
@@ -158,7 +158,7 @@ void* compressFile(void* rank)
 	printf ("%c", c[0]);
         originalBits++;
 
-        if (*c == 0x20)
+        if (c[0] == 0x20)
 	{
             length = len (codeTable[25]);
             n = codeTable[25];
@@ -166,7 +166,7 @@ void* compressFile(void* rank)
         else
 	{
             length = len (codeTable[*c - 0x61]);
-            n = codeTable[*c - 0x61];
+            n = codeTable[c[0] - 0x61];
         }
 
 	/* Compress the character */
@@ -180,11 +180,12 @@ void* compressFile(void* rank)
             length--;
             if (bitsLeft == 0)
 	    {
+		strcat (total, x);
 		size++;
-                out2 = (char *) malloc (size + 1); 
-		out2[size] = x;
-		strcat (out, out2);
-		free (out2);
+                char* tmp = (char *) malloc (size); 
+		strcpy (tmp, total);
+		free (total);
+		total = tmp;
 
 		x = 0;
                 bitsLeft = 8;
@@ -193,15 +194,15 @@ void* compressFile(void* rank)
         }
     }
 
-    if (bitsLeft != 8)
+    if (bitsLeft != 8 && flag == 1)
     {
-        x = x << (bitsLeft - 1);
+	x = x << (bitsLeft - 1);
+    	strcat (total, x);
 	size++;
-	out2 = (char *) malloc (size + 1 + 1);
-	out2[size] = x;
-	out2[size + 1] = '\0';
-	strcat (out, out2);
-	free (out2);
+	char* tmp = (char *) malloc (size);
+	strcpy (tmp total);
+	free (total);
+	total = tmp;
     }
 
     sem_wait (&arr);
