@@ -122,11 +122,10 @@ void* compressFile(void* rank)
     char bit, x = 0;
     char* c;
     int n, length, bitsLeft = 8;
-    int flag = 0;
 
     /* threading values */
     long myRank = (long) rank;
-    int split = filesize /threadCount;
+    int split = filesize / threadCount;
     int first = myRank * split;
     int last;
     int i;
@@ -135,39 +134,66 @@ void* compressFile(void* rank)
     if (threadCount - 1 == myRank) 
     {
 	    last = filesize - 1;
-	    flag = 1;
     }
     else
     {
 	    last = (myRank + 1) * split;
     }
 
-    char *tmp = (char *) malloc (sizeof (char));
     size_t size = 1;
+    int memcntr = 0;
     char* total = (char *) malloc (size);
     void *buf;
+    int buffSize = (last - first) / 4;
+    int buffCounter, chunks = 0;
 
     /* Continue to loop while the file still has characters. * 
      * Use multithreading here to break the file into chunks */
     for (i = first; i < last; i++)
-    {   
-	buf = (void*) malloc (sizeof (char)); 
-	pread (fileno (input), buf, (size_t)sizeof (char), (off_t)i);
-	c = (char*)buf;
-	free (buf);
-	printf ("%c", c[0]);
-        originalBits++;
+    { 
+	if (i == first) // first chunk
+	{
+		printf ("FIRST\n");
+	    buf = (void *) malloc (buffSize);
+	    pread (fileno (input), buf, (size_t)buffSize, (off_t)i);
+	    buffCounter = 0;
+	    chunks++;
+	}
+	else if (chunks == 1 || chunks == 2 && buffCounter == buffSize)
+	{
+		printf ("SECOND\n");
+	    buf = (void *) malloc (buffSize);
+	    pread (fileno (input), buf, (size_t)buffSize, (off_t)i);
+	    buffCounter = 0;
+	    chunks++;
+	}
+	else if (chunks == 3 && buffCounter == buffSize)
+	{
+		printf ("LAST\n");
+	    buf = (void *) malloc (last - i);
+	    pread (fileno (input), buf, (size_t)last - i, (off_t)i);
+	    buffCounter = 0;
+	    chunks++;
+	}
+	else {}
 
-        if (c[0] == 0x20)
+	c = (char*) buf;
+        originalBits++;
+	printf ("%c\n", c[buffCounter]);
+
+        if (c[buffCounter] == 0x20)
 	{
             length = len (codeTable[25]);
             n = codeTable[25];
         }
         else
 	{
-            length = len (codeTable[*c - 0x61]);
-            n = codeTable[c[0] - 0x61];
+            length = len (codeTable[c[buffCounter] - 0x61]);
+            n = codeTable[c[buffCounter] - 0x61];
         }
+        
+	free (c);
+	buffCounter++;
 
 	/* Compress the character */
         while (length > 0)
@@ -180,12 +206,16 @@ void* compressFile(void* rank)
             length--;
             if (bitsLeft == 0)
 	    {
-		strcat (total, x);
-		size++;
-                char* tmp = (char *) malloc (size); 
-		strcpy (tmp, total);
-		free (total);
-		total = tmp;
+		total[memcntr] = x;
+	    	memcntr++;
+		if (memcntr == size)
+		{
+	 	    size = size * 2;
+		    char* tmp = (char *) malloc (size);
+		    strcpy (tmp, total);
+		    free (total);
+		    total = tmp;
+		}
 
 		x = 0;
                 bitsLeft = 8;
@@ -194,19 +224,15 @@ void* compressFile(void* rank)
         }
     }
 
-    if (bitsLeft != 8 && flag == 1)
+    if (bitsLeft != 8)
     {
 	x = x << (bitsLeft - 1);
-    	strcat (total, x);
-	size++;
-	char* tmp = (char *) malloc (size);
-	strcpy (tmp total);
-	free (total);
-	total = tmp;
+    	total[memcntr] = x;
     }
 
+    printf ("SEM\n");
     sem_wait (&arr);
-    outArr[(int)myRank] = out;
+    outArr[(int)myRank] = total;
     sem_post (&arr);
 
     return;
