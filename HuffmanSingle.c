@@ -22,6 +22,7 @@ typedef struct node Node;
 
 long long englishLetterFrequencies [27] = {8, 2, 3, 4, 12, 2, 2, 6, 7, 2, 0, 4, 2, 6, 7, 2, 1, 5, 5, 7, 3, 1, 2, 0, 2, 0, 5};   
 long long codeTable[27], codeTable2[27]; 
+long long original = 0, compressed = 0;
 
 /* file values */
 int filesize;
@@ -32,7 +33,6 @@ pthread_mutex_t myMutex;
 pthread_cond_t condVar;
 sem_t arr;
 int threadCount;
-long long originalBits = 0, compressedBits = 0;
 char **outArr;
 
 /* finds and returns the smallest sub-tree in the forest */
@@ -119,21 +119,23 @@ void fillTable(long long codeTable[], Node *tree, long long Code)
 /* function to compress the input; multi or single threaded */
 void* compressFile(void* rank)
 {
+
     char bit, x = 0;
     char* c;
     int n, length, bitsLeft = 8;
+    long long originalBits = 0, compressedBits = 0;
 
     /* threading values */
     long myRank = (long) rank;
-    int split = filesize / threadCount;
+    int split = filesize /threadCount;
     int first = myRank * split;
     int last;
     int i;
-
+    
     /* last thread goes to end of file no matter what */
     if (threadCount - 1 == myRank) 
     {
-	    last = filesize - 1;
+	    last = filesize;
     }
     else
     {
@@ -144,83 +146,55 @@ void* compressFile(void* rank)
     int memcntr = 0;
     char* total = (char *) malloc (size);
     void *buf;
-    int buffSize = (last - first) / 4;
-    int buffCounter, chunks = 0;
-
+    
     /* Continue to loop while the file still has characters. * 
      * Use multithreading here to break the file into chunks */
     for (i = first; i < last; i++)
-    { 
-	if (i == first) // first chunk
-	{
-		printf ("FIRST\n");
-	    buf = (void *) malloc (buffSize);
-	    pread (fileno (input), buf, (size_t)buffSize, (off_t)i);
-	    buffCounter = 0;
-	    chunks++;
-	}
-	else if (chunks == 1 || chunks == 2 && buffCounter == buffSize)
-	{
-		printf ("SECOND\n");
-	    buf = (void *) malloc (buffSize);
-	    pread (fileno (input), buf, (size_t)buffSize, (off_t)i);
-	    buffCounter = 0;
-	    chunks++;
-	}
-	else if (chunks == 3 && buffCounter == buffSize)
-	{
-		printf ("LAST\n");
-	    buf = (void *) malloc (last - i);
-	    pread (fileno (input), buf, (size_t)last - i, (off_t)i);
-	    buffCounter = 0;
-	    chunks++;
-	}
-	else {}
-
-	c = (char*) buf;
+    {   
+	buf = (void*) malloc (1); 
+	pread (fileno (input), buf, (size_t)1, (off_t)i);
+	c = (char*)buf;
         originalBits++;
-	printf ("%c\n", c[buffCounter]);
 
-        if (c[buffCounter] == 0x20)
+        if (c[0] == 0x20)
 	{
             length = len (codeTable[25]);
             n = codeTable[25];
         }
         else
 	{
-            length = len (codeTable[c[buffCounter] - 0x61]);
-            n = codeTable[c[buffCounter] - 0x61];
+            length = len (codeTable[*c - 0x61]);
+            n = codeTable[c[0] - 0x61];
         }
-        
-	free (c);
-	buffCounter++;
+
+	free(c);
 
 	/* Compress the character */
         while (length > 0)
-	{
-            compressedBits++;
+	{   
+    	    compressedBits++;
             bit = n % 10 - 1;
             n /= 10;
             x = x | bit;
             bitsLeft--;
             length--;
+	
             if (bitsLeft == 0)
 	    {
 		total[memcntr] = x;
-	    	memcntr++;
-		if (memcntr == size)
+		memcntr++;
+		if(memcntr == size)
 		{
-	 	    size = size * 2;
-		    char* tmp = (char *) malloc (size);
+		    size = size * 2;
+        	    char* tmp = (char *) malloc (size);
 		    strcpy (tmp, total);
-		    free (total);
+	 	    free (total);
 		    total = tmp;
-		}
-
-		x = 0;
+	        }
+	        x = 0;
                 bitsLeft = 8;
-            }
-            x = x << 1;
+             }
+             x = x << 1;
         }
     }
 
@@ -228,9 +202,25 @@ void* compressFile(void* rank)
     {
 	x = x << (bitsLeft - 1);
     	total[memcntr] = x;
+	total[memcntr + 1] = '\0';
+	memcntr++;
+	if (memcntr == size)
+	{
+	    size = size * 2;
+	    char* tmp = (char *) malloc (size);
+	    strcpy (tmp, total);
+	    free (total);
+	    total = tmp;
+	}
     }
 
-    printf ("SEM\n");
+    /* update counters */
+    pthread_mutex_lock (&myMutex);
+    original += originalBits;
+    compressed += compressedBits;
+    pthread_mutex_unlock (&myMutex);
+
+    /* Add compressed string to array holding full file */
     sem_wait (&arr);
     outArr[(int)myRank] = total;
     sem_post (&arr);
@@ -374,10 +364,7 @@ int main(int argc, char* argv[])
 
 	    for (thread = 0; thread < threadCount; thread++)
 	    {
-		    for (i = 0; i < sizeof (outArr[thread]); i++)
-		    {
-			    fputc (outArr[thread][i], output);
-		    }
+		    fprintf (output, "%s", outArr[thread]);
 	    }
     }
     else 
@@ -387,9 +374,9 @@ int main(int argc, char* argv[])
     }
     GET_TIME (finish);
 
-    fprintf (stderr, "Original bits = %lli\n", originalBits * 8);
-    fprintf(stderr, "Compressed bits = %lli\n", compressedBits);
-    fprintf(stderr, "Saved %.2f%% of memory\n", ((float) compressedBits / (originalBits * 8)) * 100);
+    fprintf (stderr, "Original bits = %lli\n", original * 8);
+    fprintf(stderr, "Compressed bits = %lli\n", compressed);
+    fprintf(stderr, "Saved %.2f%% of memory\n", ((float) compressed / (original * 8)) * 100);
 
     elapsed = finish - start;
     printf ("Code took %f seconds to complete.\n", elapsed);  

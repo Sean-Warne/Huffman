@@ -7,6 +7,7 @@ int main ()
 	int i, j;
 	double start, finish, elapsed;
 	float filesize = 0.0;
+	char output[20];
 
 	char* alphabet = "abcdefghijklmnopqrstuvwxyz ";
 	int englishLetterPercent [27] = {8, 2, 3, 4, 12, 2, 2, 6, 7, 2, 0, 4, 2, 6, 7, 2, 1, 5, 5, 7, 3, 1, 2, 0, 2, 0, 5};
@@ -16,13 +17,16 @@ int main ()
 
 	printf ("Enter the size of the file in Gb > ");
 	scanf  ("%f", &filesize);
+	printf ("Enter the name of the output file > ");
+	scanf  ("%s", output);
+
 
 	int bytesPerGig = 1073741824;
 
 	// number of characters
 	int iterations = (filesize * bytesPerGig); 
 
-	f = fopen ("file.txt", "w");
+	f = fopen (output, "w");
 	if (f == NULL) {
 		printf ("Error opening file!\n");
 		exit(1);
