@@ -201,17 +201,17 @@ void* compressFile(void* rank)
     if (bitsLeft != 8)
     {
 	x = x << (bitsLeft - 1);
-    	total[memcntr] = x;
-	total[memcntr + 1] = '\0';
+    	//total[memcntr] = x;
+	//total[memcntr + 1] = '\0';
 	memcntr++;
-	if (memcntr == size)
-	{
-	    size = size * 2;
-	    char* tmp = (char *) malloc (size);
-	    strcpy (tmp, total);
-	    free (total);
-	    total = tmp;
-	}
+	//if (memcntr == size)
+	//{
+	//    size = size * 2;
+	//    char* tmp = (char *) malloc (size);
+	//    strcpy (tmp, total);
+	//    free (total);
+	//    total = tmp;
+	//}
     }
 
     /* update counters */
@@ -234,7 +234,7 @@ void decompressFile (FILE *input, FILE *output, Node *tree)
     Node *current = tree;
     char c, bit;
     char mask = 1 << 7;
-    int i, filesize = 0, readin = 0;
+    int i, readin = 0;
 
     while ( filesize > readin)
     {
@@ -316,7 +316,6 @@ int main(int argc, char* argv[])
     pthread_mutex_init (&myMutex, NULL);
     pthread_cond_init (&condVar, NULL);
     sem_init (&arr, 0, 1);
-    outArr = (char**) malloc (sizeof(char) * threadCount);
 
     double start, finish, elapsed;
 
@@ -347,6 +346,13 @@ int main(int argc, char* argv[])
 
     GET_TIME (start);
     if (compress == 1) {
+
+	    char **outArr = (char **) malloc (threadCount);
+	    for (thread = 0; thread < threadCount; thread++)
+	    {
+		outArr[i] = (char *) malloc (filesize);
+	    }
+
 	    /* thread creation loop */
 	    for (thread = 0; thread < threadCount; thread++) 
 	    {
@@ -366,6 +372,10 @@ int main(int argc, char* argv[])
 	    {
 		    fprintf (output, "%s", outArr[thread]);
 	    }
+
+	    fprintf (stderr, "Original bits = %lli\n", original * 8);
+	    fprintf(stderr, "Compressed bits = %lli\n", compressed);    
+	    fprintf(stderr, "Saved %.2f%% of memory\n", ((float) compressed / (original * 8)) * 100);
     }
     else 
     {
@@ -373,10 +383,6 @@ int main(int argc, char* argv[])
     	    decompressFile (input, output, tree);
     }
     GET_TIME (finish);
-
-    fprintf (stderr, "Original bits = %lli\n", original * 8);
-    fprintf(stderr, "Compressed bits = %lli\n", compressed);
-    fprintf(stderr, "Saved %.2f%% of memory\n", ((float) compressed / (original * 8)) * 100);
 
     elapsed = finish - start;
     printf ("Code took %f seconds to complete.\n", elapsed);  
