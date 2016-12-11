@@ -127,7 +127,7 @@ void* compressFile(void* rank)
 
     /* threading values */
     long myRank = (long) rank;
-    int split = filesize /threadCount;
+    int split = filesize / threadCount;
     int first = myRank * split;
     int last;
     int i;
@@ -142,7 +142,7 @@ void* compressFile(void* rank)
 	    last = (myRank + 1) * split;
     }
 
-    size_t size = 1;
+    size_t size = 1000;
     int memcntr = 0;
     char* total = (char *) malloc (size);
     void *buf;
@@ -181,7 +181,8 @@ void* compressFile(void* rank)
 	
             if (bitsLeft == 0)
 	    {
-		total[memcntr] = x;
+		strcat (total, &x);
+		//total[memcntr] = x;
 		memcntr++;
 		if(memcntr == size)
 		{
@@ -201,17 +202,7 @@ void* compressFile(void* rank)
     if (bitsLeft != 8)
     {
 	x = x << (bitsLeft - 1);
-    	//total[memcntr] = x;
-	//total[memcntr + 1] = '\0';
-	memcntr++;
-	//if (memcntr == size)
-	//{
-	//    size = size * 2;
-	//    char* tmp = (char *) malloc (size);
-	//    strcpy (tmp, total);
-	//    free (total);
-	//    total = tmp;
-	//}
+	strcat (total, &x);
     }
 
     /* update counters */
@@ -222,7 +213,10 @@ void* compressFile(void* rank)
 
     /* Add compressed string to array holding full file */
     sem_wait (&arr);
-    outArr[(int)myRank] = total;
+    //pthread_mutex_lock (&myMutex);
+    //outArr[(int)myRank] = total;
+    fprintf (output, "%s", total);
+    //pthread_mutex_unlock (&myMutex);
     sem_post (&arr);
 
     return;
@@ -345,13 +339,9 @@ int main(int argc, char* argv[])
     fseek (input, 0L, SEEK_SET);  
 
     GET_TIME (start);
-    if (compress == 1) {
-
-	    char **outArr = (char **) malloc (threadCount);
-	    for (thread = 0; thread < threadCount; thread++)
-	    {
-		outArr[i] = (char *) malloc (filesize);
-	    }
+    if (compress == 1) 
+    {
+	    //outArr = (char **) malloc (sizeof (char *) * threadCount);
 
 	    /* thread creation loop */
 	    for (thread = 0; thread < threadCount; thread++) 
@@ -370,8 +360,10 @@ int main(int argc, char* argv[])
 
 	    for (thread = 0; thread < threadCount; thread++)
 	    {
-		    fprintf (output, "%s", outArr[thread]);
+		    //fprintf (output, "%s", outArr[thread]);
 	    }
+
+	    //free (outArr);
 
 	    fprintf (stderr, "Original bits = %lli\n", original * 8);
 	    fprintf(stderr, "Compressed bits = %lli\n", compressed);    
