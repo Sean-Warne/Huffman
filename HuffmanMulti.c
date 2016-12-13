@@ -185,6 +185,8 @@ void* compressFile (void* rank)
         fputc (x, output);
     }
 
+    free (output);
+
     pthread_mutex_lock (&myMutex);
     original += originalBits;
     compressed += compressedBits;
@@ -308,6 +310,7 @@ int main(int argc, char* argv[])
     {
 	buf = (void *) malloc (filesize);
 	pread (fileno (input), buf, (size_t)(filesize), (off_t)0);
+	free (input);
 
 	/* thread creation loop */
 	for (thread = 0; thread < threadCount; thread++) 
@@ -329,6 +332,8 @@ int main(int argc, char* argv[])
 	printf ("Decompressing the file, please wait...\n");
 	FILE *output = fopen ("decompressed.txt", "w");
     	decompressFile (input, output, tree);
+	free (input);
+	free (output);
     }
     GET_TIME (finish);
 

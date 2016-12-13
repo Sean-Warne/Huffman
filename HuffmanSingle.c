@@ -1,228 +1,140 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include <stdlib.h>
-#include <pthread.h>
-#include <unistd.h>
-#include <semaphore.h>
-#include <string.h>
-#include "timer.h"
 
-#define len(x) ((long long) log10(x) + 1)
+#define len(x) ((int)log10(x)+1)
 
 /* Node of the huffman tree */
-struct node 
-{
-    long long value;
+struct node{
+    int value;
     char letter;
-    struct node *left, *right;
+    struct node *left,*right;
 };
 
 typedef struct node Node;
 
-long long englishLetterFrequencies [27] = {8, 2, 3, 4, 12, 2, 2, 6, 7, 2, 0, 4, 2, 6, 7, 2, 1, 5, 5, 7, 3, 1, 2, 0, 2, 0, 5};   
-long long codeTable[27], codeTable2[27]; 
-long long original = 0, compressed = 0;
+/* 81 = 8.1%, 128 = 12.8% and so on. The 27th frequency is the space. Source is Wikipedia */
+int englishLetterFrequencies [27] = {8, 2, 3, 4, 12, 2, 2, 6, 7, 2, 0, 4, 2, 6, 7, 2, 1, 5, 5, 7, 3, 1, 2, 0, 2, 0, 5};
 
-/* file values */
-int filesize;
-FILE *input, *output;
+/*finds and returns the small sub-tree in the forrest*/
+int findSmaller (Node *array[], int differentFrom){
+    int smaller;
+    int i = 0;
 
-/* multithreading variables */
-pthread_mutex_t myMutex;
-pthread_cond_t condVar;
-sem_t arr;
-int threadCount;
-char **outArr;
-
-/* finds and returns the smallest sub-tree in the forest */
-long long findSmaller (Node *array[], long long differentFrom)
-{
-    long long smaller;
-    long long i = 0L;
-
-    while (array[i]->value == -1)
+    while (array[i]->value==-1)
         i++;
-    smaller = i;
-
-    if (i == differentFrom)
-    {
+    smaller=i;
+    if (i==differentFrom){
         i++;
-        while (array[i]->value == -1)
+        while (array[i]->value==-1)
             i++;
         smaller=i;
     }
 
-    for (i = 1; i < 27; i++)
-    {
-        if (array[i]->value == -1)
+    for (i=1;i<27;i++){
+        if (array[i]->value==-1)
             continue;
-        if (i == differentFrom)
+        if (i==differentFrom)
             continue;
-        if (array[i]->value < array[smaller]->value)
+        if (array[i]->value<array[smaller]->value)
             smaller = i;
     }
 
     return smaller;
 }
 
-/* builds the huffman tree and returns its address by reference */
-void buildHuffmanTree (Node **tree)
-{
+/*builds the huffman tree and returns its address by reference*/
+void buildHuffmanTree(Node **tree){
     Node *temp;
     Node *array[27];
-    long long i, subTrees = 27L;
-    long long smallOne, smallTwo;
+    int i, subTrees = 27;
+    int smallOne,smallTwo;
 
-    for (i = 0; i < 27; i++)
-    {
-        array[i] = malloc (sizeof (Node));
+    for (i=0;i<27;i++){
+        array[i] = malloc(sizeof(Node));
         array[i]->value = englishLetterFrequencies[i];
         array[i]->letter = i;
         array[i]->left = NULL;
         array[i]->right = NULL;
     }
 
-    while (subTrees > 1)
-    {
-        smallOne = findSmaller (array, -1);
-        smallTwo = findSmaller (array, smallOne);
+    while (subTrees>1){
+        smallOne=findSmaller(array,-1);
+        smallTwo=findSmaller(array,smallOne);
         temp = array[smallOne];
-        array[smallOne] = malloc (sizeof (Node));
-        array[smallOne]->value = temp->value + array[smallTwo]->value;
-        array[smallOne]->letter = 127;
-        array[smallOne]->left = array[smallTwo];
-        array[smallOne]->right = temp;
-        array[smallTwo]->value = -1;
+        array[smallOne] = malloc(sizeof(Node));
+        array[smallOne]->value=temp->value+array[smallTwo]->value;
+        array[smallOne]->letter=127;
+        array[smallOne]->left=array[smallTwo];
+        array[smallOne]->right=temp;
+        array[smallTwo]->value=-1;
         subTrees--;
     }
 
     *tree = array[smallOne];
 
+return;
+}
+
+/* builds the table with the bits for each letter. 1 stands for binary 0 and 2 for binary 1 (used to facilitate arithmetic)*/
+void fillTable(int codeTable[], Node *tree, int Code){
+    if (tree->letter<27)
+        codeTable[(int)tree->letter] = Code;
+    else{
+        fillTable(codeTable, tree->left, Code*10+1);
+        fillTable(codeTable, tree->right, Code*10+2);
+    }
+
     return;
 }
 
-/* builds the table with the bits for each letter. 1 stands for binary 0 and 2 for binary 1 (used to facilitate arithmetic) */
-void fillTable(long long codeTable[], Node *tree, long long Code)
-{
-    if (tree->letter < 27)
-        codeTable[(long long) tree->letter] = Code;
-    else
-    {
-        fillTable (codeTable, tree->left, Code * 10 + 1);
-        fillTable (codeTable, tree->right, Code * 10 + 2);
-    }
+/*function to compress the input*/
+void compressFile(FILE *input, FILE *output, int codeTable[]){
+    char bit, c, x = 0;
+    int n,length,bitsLeft = 8;
+    int originalBits = 0, compressedBits = 0;
 
-    return;
-}
-
-/* function to compress the input; multi or single threaded */
-void* compressFile(void* rank)
-{
-
-    char bit, x = 0;
-    char* c;
-    int n, length, bitsLeft = 8;
-    long long originalBits = 0, compressedBits = 0;
-
-    /* threading values */
-    long myRank = (long) rank;
-    int split = filesize / threadCount;
-    int first = myRank * split;
-    int last;
-    int i;
-    
-    /* last thread goes to end of file no matter what */
-    if (threadCount - 1 == myRank) 
-    {
-	    last = filesize;
-    }
-    else
-    {
-	    last = (myRank + 1) * split;
-    }
-
-    size_t size = 1000;
-    int memcntr = 0;
-    char* total = (char *) malloc (size);
-    void *buf;
-    
-    /* Continue to loop while the file still has characters. * 
-     * Use multithreading here to break the file into chunks */
-    for (i = first; i < last; i++)
-    {   
-	buf = (void*) malloc (1); 
-	pread (fileno (input), buf, (size_t)1, (off_t)i);
-	c = (char*)buf;
+    while ((c=fgetc(input))!=10){
         originalBits++;
-
-        if (c[0] == 0x20)
-	{
-            length = len (codeTable[25]);
-            n = codeTable[25];
+        if (c==32){
+            length = len(codeTable[26]);
+            n = codeTable[26];
         }
-        else
-	{
-            length = len (codeTable[*c - 0x61]);
-            n = codeTable[c[0] - 0x61];
+        else{
+            length=len(codeTable[c-97]);
+            n = codeTable[c-97];
         }
 
-	free(c);
-
-	/* Compress the character */
-        while (length > 0)
-	{   
-    	    compressedBits++;
+        while (length>0){
+            compressedBits++;
             bit = n % 10 - 1;
             n /= 10;
             x = x | bit;
             bitsLeft--;
             length--;
-	
-            if (bitsLeft == 0)
-	    {
-		strcat (total, &x);
-		//total[memcntr] = x;
-		memcntr++;
-		if(memcntr == size)
-		{
-		    size = size * 2;
-        	    char* tmp = (char *) malloc (size);
-		    strcpy (tmp, total);
-	 	    free (total);
-		    total = tmp;
-	        }
-	        x = 0;
+            if (bitsLeft==0){
+                fputc(x,output);
+                x = 0;
                 bitsLeft = 8;
-             }
-             x = x << 1;
+            }
+            x = x << 1;
         }
     }
 
-    if (bitsLeft != 8)
-    {
-	x = x << (bitsLeft - 1);
-	strcat (total, &x);
+    if (bitsLeft!=8){
+        x = x << (bitsLeft-1);
+        fputc(x,output);
     }
 
-    /* update counters */
-    pthread_mutex_lock (&myMutex);
-    original += originalBits;
-    compressed += compressedBits;
-    pthread_mutex_unlock (&myMutex);
-
-    /* Add compressed string to array holding full file */
-    sem_wait (&arr);
-    //pthread_mutex_lock (&myMutex);
-    //outArr[(int)myRank] = total;
-    fprintf (output, "%s", total);
-    //pthread_mutex_unlock (&myMutex);
-    sem_post (&arr);
+    /*print details of compression on the screen*/
+    fprintf(stderr,"Original bits = %dn",originalBits*8);
+    fprintf(stderr,"Compressed bits = %dn",compressedBits);
+    fprintf(stderr,"Saved %.2f%% of memoryn",((float)compressedBits/(originalBits*8))*100);
 
     return;
 }
 
-/* function to decompress the input */
+/*function to decompress the input*/
 void decompressFile (FILE *input, FILE *output, Node *tree)
 {
     Node *current = tree;
@@ -268,48 +180,31 @@ void decompressFile (FILE *input, FILE *output, Node *tree)
     return;
 }
 
-/* invert the codes in codeTable2 so they can be used with mod operator by compressFile function */
-void invertCodes(long long codeTable[], long long codeTable2[])
-{
-    long long i, n, copy;
+/*invert the codes in codeTable2 so they can be used with mod operator by compressFile function*/
+void invertCodes(int codeTable[],int codeTable2[]){
+    int i, n, copy;
 
-    for (i = 0; i < 27; i++)
-    {
+    for (i=0;i<27;i++){
         n = codeTable[i];
-        copy = 0L;
-        while (n > 0)
-	{
-            copy = copy * 10l + n % 10l;
-            n /= 10l;
+        copy = 0;
+        while (n>0){
+            copy = copy * 10 + n %10;
+            n /= 10;
         }
-        codeTable2[i] = copy;
+        codeTable2[i]=copy;
     }
 
 return;
 }
 
-int main(int argc, char* argv[])
+int main()
 {
-    if (sizeof (argv) == 0) 
-    {
-	    printf ("Usage: ./huffman <number of threads>");
-	    return 0;
-    }
-
     Node *tree;
+    long long codeTable[26], codeTable2[26];
     long long compress;
     char inFile[20];
     char outFile[20];
-    int i;
-
-    /* initialize multithreading values */
-    long thread;
-    pthread_t* threadHandles;
-    threadCount = strtol (argv[1], NULL, 10);
-    threadHandles = (pthread_t*) malloc (threadCount * sizeof (pthread_t));
-    pthread_mutex_init (&myMutex, NULL);
-    pthread_cond_init (&condVar, NULL);
-    sem_init (&arr, 0, 1);
+    FILE *input, *output;
 
     double start, finish, elapsed;
 
@@ -333,44 +228,12 @@ int main(int argc, char* argv[])
     input = fopen(inFile, "r");
     output = fopen(outFile, "w");
 
-    /* determine size of file in bytes */
-    fseek (input, 0L, SEEK_END);
-    filesize = (int) ftell (input);    
-    fseek (input, 0L, SEEK_SET);  
-
     GET_TIME (start);
-    if (compress == 1) 
-    {
-	    //outArr = (char **) malloc (sizeof (char *) * threadCount);
-
-	    /* thread creation loop */
-	    for (thread = 0; thread < threadCount; thread++) 
-	    {
-		    pthread_create (&threadHandles[thread], NULL, compressFile, (void*) thread);
-	    }
-
+    if (compress == 1) {
 	    printf ("Compressing the file, please wait...\n");
-
-	    /* Rejoin threads */
-	    for (thread = 0; thread < threadCount; thread++) 
-	    {
-		    pthread_join (threadHandles[thread], NULL);
-		    pthread_detach (threadHandles[thread]);
-	    }
-
-	    for (thread = 0; thread < threadCount; thread++)
-	    {
-		    //fprintf (output, "%s", outArr[thread]);
-	    }
-
-	    //free (outArr);
-
-	    fprintf (stderr, "Original bits = %lli\n", original * 8);
-	    fprintf(stderr, "Compressed bits = %lli\n", compressed);    
-	    fprintf(stderr, "Saved %.2f%% of memory\n", ((float) compressed / (original * 8)) * 100);
+	    compressFile (input, output, codeTable2);
     }
-    else 
-    {
+    else {
 	    printf ("Decompressing the file, please wait...\n");
     	    decompressFile (input, output, tree);
     }
