@@ -3,6 +3,9 @@ Authors: Stein, Lucas
 	 Warne, Sean
 Data: 12/13/2016
 
+Original (base) Code Retrieved From:
+Scocco, D. (2011, December 8). Implementing Huffman Coding in C. Retrieved November 14, 2016, from http://www.programminglogic.com/implementing-huffman-coding-in-c/
+
 Program: FileCreator.c
 Description: Creates a file of a specified size (in GB) using the frequency of 
 	     the letters in the English language. The text file it creates 
