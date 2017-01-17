@@ -1,26 +1,26 @@
-Authors: Stein, Lucas
-	 Walker, Jonathan
-	 Warne, Sean
-Data: 12/13/2016
+Authors: Stein, Lucas  
+	 Walker, Jonathan  
+	 Warne, Sean  
+Data: 12/13/2016  
 
-Original (base) Code Retrieved From:
+Original (base) Code Retrieved From:  
 Scocco, D. (2011, December 8). Implementing Huffman Coding in C. Retrieved November 14, 2016, from http://www.programminglogic.com/implementing-huffman-coding-in-c/
 
-Program: FileCreator.c
+Program: FileCreator.c  
 Description: Creates a file of a specified size (in GB) using the frequency of 
 	     the letters in the English language. The text file it creates 
 	     consists of a single string of the lowercase alphabet and spaces.
 
-Program: HuffmanSingle.c
+Program: HuffmanSingle.c  
 Description: The single threaded implementation of the Huffman Algorithm. Used
 	     for testing purposes (slightly modified original code). 
 
-Program: HuffmanMulti.c
+Program: HuffmanMulti.c  
 Description: The multi-threaded implementation of the Huffman Algorithm. Takes
 	     one argument: the number of threads and prompts the user for an
 	     input filename and whether to decompress or compress the file.
 
-Program: combine.sh
+Program: combine.sh  
 Description: Used by HuffmanMulti.c to combine the multi-part compressed output
 	     files into a single file. Also removes the old output file and the
 	     parts.
